@@ -1,0 +1,309 @@
+# Task Manager API
+
+A secure RESTful API for managing personal tasks. 
+- `node-api/` — Node.js + Express.js
+
+
+Uses **PostgreSQL** for user storage and **MongoDB** for task storage.
+
+---
+
+## Folder Structure
+
+```
+task-manager/
+├── node-api/                   # Node.js version
+│   ├── src/
+│   │   ├── config/             # DB connection setup (postgres.js, mongo.js)
+│   │   ├── controllers/        # Business logic (user.controller.js, task.controller.js)
+│   │   ├── middleware/         # JWT auth + global error handler
+│   │   ├── models/             # Mongoose task schema
+│   │   ├── routes/             # Route definitions (auth, tasks)
+│   │   └── validators/         # Joi validation schemas
+│   ├── server.js               # Entry point
+│   ├── .env.example
+│   ├── docker-compose.yml
+│   └── package.json
+
+
+### So my Design Decisions
+
+- **PostgreSQL for users** — User data is relational (unique emails, auth), so a SQL database is the right fit.
+- **MongoDB for tasks** — Tasks have optional/flexible fields and belong to one user, making a document store clean and simple.
+- **JWT stateless auth** — No session storage needed; each request carries its own identity.
+- **Joi / Pydantic** — Validation is kept in a dedicated layer, separate from business logic.
+- **Controllers/Services split** — Route files only define paths; all logic lives in controllers.
+
+---
+##You can download the conatiner image easy for you rather then doing manual setup installation 
+  or
+## Setup — Node.js Version
+
+### Requirements
+- Node.js 18+
+- PostgreSQL running locally (or via Docker)
+- MongoDB running locally (or via Docker)
+
+### Steps
+
+
+cd node-api
+
+# 1. Install dependencies
+npm install
+
+# 2. Copy env file and fill in your values
+cp .env.example .env
+
+# 3. Make sure PostgreSQL and MongoDB are running, then:
+npm run dev
+```
+
+Server starts at: `http://localhost:3000`
+
+### With Docker (recommended)
+
+```
+cd node-api
+cp .env.example .env
+docker-compose up --build
+```
+
+
+
+## API Documentation
+
+Base URL:
+- Node.js: `http://localhost:3000`
+
+
+All protected routes require this header:
+```
+Authorization: Bearer <your_token>
+```
+
+---
+
+### Auth Endpoints
+
+#### POST `/api/auth/register`
+Create a new user account.
+
+**Request Body:**
+```json
+{
+  "email": "john@example.com",
+  "password": "secret123"
+}
+```
+
+**Response 201:**
+```json
+{
+  "message": "Account created successfully!",
+  "user": { "id": 1, "email": "john@example.com" }
+}
+```
+
+**Errors:**
+- `400` — Invalid email format or password too short
+- `409` — Email already in use
+
+---
+
+#### POST `/api/auth/login`
+Log in and receive a JWT token.
+
+**Request Body:**
+```json
+{
+  "email": "john@example.com",
+  "password": "secret123"
+}
+```
+
+**Response 200:**
+```json
+{
+  "message": "Login successful!",
+  "token": "eyJhbGciOi...",
+  "user": { "id": 1, "email": "john@example.com" }
+}
+```
+
+**Errors:**
+- `401` — Wrong email or password
+
+---
+
+#### GET `/api/auth/me` 🔒
+Get the currently logged-in user's profile.
+
+**Response 200:**
+```json
+{
+  "user": {
+    "id": 1,
+    "email": "john@example.com",
+    "created_at": "2024-01-15T10:30:00Z"
+  }
+}
+```
+
+---
+
+### Task Endpoints
+
+All task endpoints require a valid JWT token.
+
+---
+
+#### POST `/api/tasks` 🔒
+Create a new task.
+
+**Request Body:**
+```json
+{
+  "title": "Buy groceries",
+  "description": "Milk, eggs, bread",
+  "due_date": "2024-12-31T00:00:00Z",
+  "status": "pending"
+}
+```
+
+**Response 201:**
+```json
+{
+  "message": "Task created!",
+  "task": {
+    "id": "64f1a2b3c4d5e6f7a8b9c0d1",
+    "title": "Buy groceries",
+    "description": "Milk, eggs, bread",
+    "due_date": "2024-12-31T00:00:00Z",
+    "status": "pending",
+    "owner_id": 1,
+    "created_at": "2024-01-15T10:30:00Z",
+    "updated_at": "2024-01-15T10:30:00Z"
+  }
+}
+```
+
+**Errors:**
+- `400` — Missing title, invalid due_date format, invalid status value
+
+---
+
+#### GET `/api/tasks` 🔒
+Get all tasks belonging to the logged-in user.
+
+**Response 200:**
+```json
+{
+  "count": 2,
+  "tasks": [
+    { "id": "...", "title": "Buy groceries", "status": "pending", ... },
+    { "id": "...", "title": "Fix laptop", "status": "completed", ... }
+  ]
+}
+```
+
+---
+
+#### GET `/api/tasks/:id` 🔒
+Get a single task by its ID.
+
+**Response 200:**
+```json
+{
+  "task": {
+    "id": "64f1a2b3c4d5e6f7a8b9c0d1",
+    "title": "Buy groceries",
+    ...
+  }
+}
+```
+
+**Errors:**
+- `400` — Invalid ID format
+- `403` — Task belongs to another user
+- `404` — Task not found
+
+---
+
+#### PATCH `/api/tasks/:id` 🔒
+Update one or more fields of a task. All fields are optional.
+
+**Request Body (partial update example):**
+```json
+{
+  "status": "completed"
+}
+```
+
+**Response 200:**
+```json
+{
+  "message": "Task updated!",
+  "task": { "id": "...", "status": "completed", ... }
+}
+```
+
+**Errors:**
+- `400` — No fields provided, invalid values
+- `403` — Task belongs to another user
+- `404` — Task not found
+
+---
+
+#### DELETE `/api/tasks/:id` 🔒
+Delete a task permanently.
+
+**Response 200:**
+```json
+{
+  "message": "Task deleted successfully."
+}
+```
+
+**Errors:**
+- `403` — Task belongs to another user
+- `404` — Task not found
+
+---
+
+## Error Response Format
+
+All errors follow this consistent structure:
+
+```json
+{
+  "message": "Human-readable error description."
+}
+```
+
+Validation errors include an `errors` array:
+```json
+{
+  "message": "Validation failed",
+  "errors": ["Email is required", "Password must be at least 6 characters"]
+}
+```
+
+---
+
+## Environment Variables
+
+| Variable | Description | Example |
+|---|---|---|
+| `PORT` | Server port | `3000` |
+| `PG_HOST` | PostgreSQL host | `localhost` |
+| `PG_PORT` | PostgreSQL port | `5432` |
+| `PG_DATABASE` | Database name | `taskmanager` |
+| `PG_USER` | DB username | `postgres` |
+| `PG_PASSWORD` | DB password | `yourpassword` |
+| `MONGO_URI` | MongoDB connection string | `mongodb://localhost:27017/taskmanager` |
+| `JWT_SECRET` | Secret for signing tokens | `your_secret_key` |
+| `JWT_EXPIRES_IN` | Token expiry (Node.js) | `7d` |
+| `JWT_EXPIRES_MINUTES` | Token expiry in minutes (FastAPI) | `10080` |
+
+.
