@@ -1,0 +1,40 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15
+    container_name: taskmanager_postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: yourpassword
+      POSTGRES_DB: taskmanager
+    ports:
+      - '5432:5432'
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+
+  mongo:
+    image: mongo:7
+    container_name: taskmanager_mongo
+    ports:
+      - '27017:27017'
+    volumes:
+      - mongo_data:/data/db
+
+  api:
+    build: .
+    container_name: taskmanager_api
+    ports:
+      - '3000:3000'
+    env_file:
+      - .env
+    environment:
+      PG_HOST: postgres
+      MONGO_URI: mongodb://mongo:27017/taskmanager
+    depends_on:
+      - postgres
+      - mongo
+
+volumes:
+  pg_data:
+  mongo_data:
